@@ -6,6 +6,7 @@ local VFlow = _G.VFlow
 if not VFlow then return end
 
 local MODULE_KEY = "VFlow.Buffs"
+local Profiler = VFlow.Profiler
 
 -- =========================================================
 -- 模块状态
@@ -13,12 +14,17 @@ local MODULE_KEY = "VFlow.Buffs"
 
 local _groupSpellMap = {}   -- {[spellID] = groupIndex}
 local _groupContainers = {} -- {[groupIndex] = frame}
+local _spellMapDirty = true
 
 -- =========================================================
 -- Spell ID映射构建
 -- =========================================================
 
 local function RebuildSpellMap()
+    local _pt = Profiler.start("BG:RebuildSpellMap")
+    if not _spellMapDirty then Profiler.stop(_pt) return _groupSpellMap end
+    _spellMapDirty = false
+
     wipe(_groupSpellMap)
 
     local db = VFlow.getDB(MODULE_KEY)
@@ -58,6 +64,7 @@ local function RebuildSpellMap()
         end
     end
 
+    Profiler.stop(_pt)
     return _groupSpellMap
 end
 
@@ -118,6 +125,7 @@ local function GetGroupIdxForIcon(icon, spellMap)
 end
 
 local function ClassifyIcons(allIcons)
+    Profiler.count("BG:ClassifyIcons")
     local spellMap = RebuildSpellMap()
     local mainVisible = {}
     local groupBuckets = {}
@@ -154,73 +162,71 @@ end
 
 local function InitGroupContainers()
     local db = VFlow.getDB(MODULE_KEY)
-    if not db or not db.customGroups then return end
+    local groups = db and db.customGroups
 
-    for i, group in ipairs(db.customGroups) do
+    for i, container in pairs(_groupContainers) do
+        VFlow.DragFrame.unregister(container)
+        container:Hide()
+        container:SetParent(nil)
+        _groupContainers[i] = nil
+    end
+
+    if not groups then return end
+
+    for i, group in ipairs(groups) do
         if group and group.config then
-            if not _groupContainers[i] then
-                local container = CreateFrame("Frame", "VFlow_BuffGroup_" .. i, UIParent)
-                container:SetFrameStrata("MEDIUM")
-                container:SetFrameLevel(10)
-                container:SetSize(200, 50)
-                container:SetMovable(true)
-                container:SetClampedToScreen(true)
+            local container = CreateFrame("Frame", "VFlow_BuffGroup_" .. i, UIParent)
+            container:SetFrameStrata("MEDIUM")
+            container:SetFrameLevel(10)
+            container:SetSize(200, 50)
+            container:SetMovable(true)
+            container:SetClampedToScreen(true)
 
-                -- 应用保存的位置
-                local x = group.config.x or 0
-                local y = group.config.y or (-260 - (i - 1) * 60)
-                container:ClearAllPoints()
-                container:SetPoint("CENTER", UIParent, "CENTER", x, y)
+            local x = group.config.x or 0
+            local y = group.config.y or (-260 - (i - 1) * 60)
+            container:ClearAllPoints()
+            container:SetPoint("CENTER", UIParent, "CENTER", x, y)
 
-                -- 注册拖拽
-                VFlow.DragFrame.register(container, {
-                    label = group.name or ("自定义组" .. i),
-                    onPositionChanged = function(frame, point, x, y)
-                        group.config.x = x
-                        group.config.y = y
-                        VFlow.Store.set(MODULE_KEY, "customGroups", db.customGroups)
-                    end,
-                    getAnchorOffset = function(frame)
-                        -- 根据 growDirection 计算锚点偏移补偿
-                        local cfg = group.config
-                        if not cfg or not cfg.dynamicLayout then
-                            return 0, 0
-                        end
-
-                        local growDir = cfg.growDirection or "center"
-                        if growDir == "center" then
-                            return 0, 0
-                        end
-
-                        local w, h = frame:GetSize()
-                        local isVertical = (cfg.vertical == true)
-
-                        if not isVertical then
-                            -- 水平布局
-                            if growDir == "start" then
-                                -- 锚点在 LEFT，需要向左偏移容器宽度的一半
-                                return -w / 2, 0
-                            elseif growDir == "end" then
-                                -- 锚点在 RIGHT，需要向右偏移容器宽度的一半
-                                return w / 2, 0
-                            end
-                        else
-                            -- 垂直布局
-                            if growDir == "start" then
-                                -- 锚点在 TOP，需要向上偏移容器高度的一半
-                                return 0, h / 2
-                            elseif growDir == "end" then
-                                -- 锚点在 BOTTOM，需要向下偏移容器高度的一半
-                                return 0, -h / 2
-                            end
-                        end
-
+            VFlow.DragFrame.register(container, {
+                label = group.name or ("自定义组" .. i),
+                onPositionChanged = function(frame, point, x, y)
+                    group.config.x = x
+                    group.config.y = y
+                    VFlow.Store.set(MODULE_KEY, "customGroups", db.customGroups)
+                end,
+                getAnchorOffset = function(frame)
+                    local cfg = group.config
+                    if not cfg or not cfg.dynamicLayout then
                         return 0, 0
-                    end,
-                })
+                    end
 
-                _groupContainers[i] = container
-            end
+                    local growDir = cfg.growDirection or "center"
+                    if growDir == "center" then
+                        return 0, 0
+                    end
+
+                    local w, h = frame:GetSize()
+                    local isVertical = (cfg.vertical == true)
+
+                    if not isVertical then
+                        if growDir == "start" then
+                            return -w / 2, 0
+                        elseif growDir == "end" then
+                            return w / 2, 0
+                        end
+                    else
+                        if growDir == "start" then
+                            return 0, h / 2
+                        elseif growDir == "end" then
+                            return 0, -h / 2
+                        end
+                    end
+
+                    return 0, 0
+                end,
+            })
+
+            _groupContainers[i] = container
         end
     end
 end
@@ -470,6 +476,6 @@ VFlow.Store.watch(MODULE_KEY, "BuffGroups", function(key, value)
         return
     end
 
-    -- 其他配置变化：重新构建映射表（不需要脏标记，直接重建）
-    RebuildSpellMap()
+    -- 其他配置变化：标记映射表需要重建
+    _spellMapDirty = true
 end)

@@ -14,10 +14,17 @@ VFlow.registerModule(MODULE_KEY, {
 
 local CHANGELOG = {
     {
-        version = "0.1.1",
-        date = "2026-03-18",
+        version = "0.1.5",
+        date = "2026-03-19",
         content = {
-            "修复若干BUG",
+            "修复堆叠文本层级BUG,修复自定义图形监控高占用BUG",
+        }
+    },
+    {
+        version = "0.1.3",
+        date = "2026-03-19",
+        content = {
+            "性能优化, 修复若干BUG",
         }
     },
     {
@@ -62,7 +69,7 @@ local function renderContent(container, menuKey)
                 local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
                 fs:SetPoint("TOP", texture, "BOTTOM", 0, -10)
                 local addonVersion = C_AddOns and C_AddOns.GetAddOnMetadata("VFlow", "Version") or
-                GetAddOnMetadata and GetAddOnMetadata("VFlow", "Version") or ""
+                    GetAddOnMetadata and GetAddOnMetadata("VFlow", "Version") or ""
                 fs:SetText(addonVersion ~= "" and ("VFlow v" .. addonVersion) or "VFlow")
                 fs:SetTextColor(unpack(primaryColor))
             end
@@ -106,17 +113,10 @@ local function renderContent(container, menuKey)
             "插件中大部分功能基于系统冷却管理器实现，你需要在{冷却管理器}中配置你需要监控的技能，通过本插件进行美化和增强。支持技能分组，BUFF分组，自定义图形监控等功能。框体移动有两种方式：{系统编辑模式}会打开暴雪编辑界面；插件右上角的{内部编辑模式}，不依赖暴雪编辑界面，可直接编辑本插件内所有已注册框体。",
             links = {
                 ["冷却管理器"] = function()
-                    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-                        HideUIPanel(EditModeManagerFrame)
-                    end
-                    if CooldownViewerSettings then
-                        CooldownViewerSettings:ShowUIPanel(false)
-                    end
+                    VFlow.openCooldownManager()
                 end,
                 ["系统编辑模式"] = function()
-                    if EditModeManagerFrame then
-                        ShowUIPanel(EditModeManagerFrame)
-                    end
+                    VFlow.toggleSystemEditMode()
                 end,
                 ["内部编辑模式"] = function()
                     if VFlow.DragFrame and VFlow.DragFrame.setInternalEditMode then

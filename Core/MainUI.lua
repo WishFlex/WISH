@@ -486,8 +486,17 @@ renderMenu = function()
                     deleteBtn:SetScript("OnClick", function()
                         UI.dialog(UIParent, "删除分组", "删除后该分组配置将被移除，是否继续？", function()
                             local groups = getCustomGroupsForCategory(category.key)
+                            local moduleKey = nil
+                            if category.key == "skills" then
+                                moduleKey = "VFlow.Skills"
+                            elseif category.key == "buffs" then
+                                moduleKey = "VFlow.Buffs"
+                            end
                             if groups and item.customIndex and groups[item.customIndex] then
                                 table.remove(groups, item.customIndex)
+                                if moduleKey and VFlow.Store and VFlow.Store.set then
+                                    VFlow.Store.set(moduleKey, "customGroups", groups)
+                                end
                             end
                             loadCustomGroups()
                             if currentMenuKey == item.key then
@@ -822,13 +831,7 @@ local function createMainFrame()
         GameTooltip:Hide()
     end)
     systemEditBtn:SetScript("OnClick", function()
-        if EditModeManagerFrame then
-            if EditModeManagerFrame:IsShown() then
-                HideUIPanel(EditModeManagerFrame)
-            else
-                ShowUIPanel(EditModeManagerFrame)
-            end
-        end
+        VFlow.toggleSystemEditMode()
     end)
     updateSystemEditButtonVisual()
 
@@ -886,12 +889,7 @@ local function createMainFrame()
         GameTooltip:Hide()
     end)
     cdManagerBtn:SetScript("OnClick", function()
-        if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-            HideUIPanel(EditModeManagerFrame)
-        end
-        if CooldownViewerSettings then
-            CooldownViewerSettings:ShowUIPanel(false)
-        end
+        VFlow.openCooldownManager()
     end)
 
     -- 左侧菜单区域
@@ -969,6 +967,29 @@ VFlow.State.watch("inCombat", "VFlow.MainUI", function(inCombat)
         end
     end
 end)
+
+-- =========================================================
+-- 系统功能统一入口
+-- =========================================================
+
+VFlow.openCooldownManager = function()
+    if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
+        HideUIPanel(EditModeManagerFrame)
+    end
+    if CooldownViewerSettings then
+        CooldownViewerSettings:ShowUIPanel(false)
+    end
+end
+
+VFlow.toggleSystemEditMode = function()
+    if EditModeManagerFrame then
+        if EditModeManagerFrame:IsShown() then
+            HideUIPanel(EditModeManagerFrame)
+        else
+            ShowUIPanel(EditModeManagerFrame)
+        end
+    end
+end
 
 VFlow.MainUI = {
     show = function()

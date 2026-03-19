@@ -237,7 +237,7 @@ local function buildSpellConfigLayout(monitorTypeOptions, timerFontLabel, isSkil
             { type = "subtitle", text = "基础设置", cols = 24 },
             { type = "separator", cols = 24 },
             { type = "checkbox", key = "enabled", label = "启用该技能自定义监控", cols = 12 },
-            { type = "checkbox", key = "hideInCooldownManager", label = "在冷却管理器中隐藏", cols = 12 },
+            { type = "checkbox", key = "hideInCooldownManager", label = "在冷却管理器中隐藏(需RL)", cols = 12 },
         },
         {
             { type = "dropdown", key = "monitorType", label = "监控类型", cols = 12, items = monitorTypeOptions },
@@ -335,7 +335,7 @@ local function buildSpellConfigLayout(monitorTypeOptions, timerFontLabel, isSkil
                 text  = "可在{编辑模式}中预览和拖拽修改位置",
                 links = {
                     ["编辑模式"] = function()
-                        if EditModeManagerFrame then ShowUIPanel(EditModeManagerFrame) end
+                        VFlow.toggleSystemEditMode()
                     end,
                 },
             },
@@ -641,10 +641,7 @@ local function renderContent(container, menuKey)
                 text = "仅可使用{冷却管理器}中追踪的BUFF，{点我重新扫描}。",
                 links = {
                     ["冷却管理器"] = function()
-                        if EditModeManagerFrame and EditModeManagerFrame:IsShown() then
-                            HideUIPanel(EditModeManagerFrame)
-                        end
-                        if CooldownViewerSettings then CooldownViewerSettings:ShowUIPanel(false) end
+                        VFlow.openCooldownManager()
                     end,
                     ["点我重新扫描"] = function()
                         if VFlow.BuffScanner then VFlow.BuffScanner.scan() end

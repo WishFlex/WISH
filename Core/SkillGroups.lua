@@ -6,6 +6,7 @@ local VFlow = _G.VFlow
 if not VFlow then return end
 
 local MODULE_KEY = "VFlow.Skills"
+local Profiler = VFlow.Profiler
 
 -- =========================================================
 -- 模块状态
@@ -13,12 +14,17 @@ local MODULE_KEY = "VFlow.Skills"
 
 local _groupSpellMap = {}   -- {[spellID] = groupIndex}
 local _groupContainers = {} -- {[groupIndex] = frame}
+local _spellMapDirty = true -- 脏标志：只在配置变更时重建
 
 -- =========================================================
 -- Spell ID映射构建
 -- =========================================================
 
 local function RebuildSpellMap()
+    local _pt = Profiler.start("SG:RebuildSpellMap")
+    if not _spellMapDirty then Profiler.stop(_pt) return _groupSpellMap end
+    _spellMapDirty = false
+
     wipe(_groupSpellMap)
 
     local db = VFlow.getDB(MODULE_KEY)
@@ -58,6 +64,7 @@ local function RebuildSpellMap()
         end
     end
 
+    Profiler.stop(_pt)
     return _groupSpellMap
 end
 
@@ -109,6 +116,7 @@ local function GetGroupIdxForIcon(icon, spellMap)
 end
 
 local function ClassifyIcons(allIcons)
+    Profiler.count("SG:ClassifyIcons")
     local spellMap = RebuildSpellMap()
     local mainVisible = {}
     local groupBuckets = {}
@@ -187,12 +195,27 @@ local function EnsureGroupContainer(groupIdx)
     return container
 end
 
+local function ReleaseGroupContainer(groupIdx)
+    local container = _groupContainers[groupIdx]
+    if not container then return end
+    VFlow.DragFrame.unregister(container)
+    container:Hide()
+    container:SetParent(nil)
+    _groupContainers[groupIdx] = nil
+end
+
 -- 初始化所有容器（用于配置变更时）
 local function InitGroupContainers()
     local db = VFlow.getDB(MODULE_KEY)
-    if not db or not db.customGroups then return end
+    local groups = db and db.customGroups
 
-    for i, group in ipairs(db.customGroups) do
+    for groupIdx in pairs(_groupContainers) do
+        ReleaseGroupContainer(groupIdx)
+    end
+
+    if not groups then return end
+
+    for i, group in ipairs(groups) do
         if group and group.config then
             EnsureGroupContainer(i)
         end
@@ -380,7 +403,7 @@ VFlow.SkillGroups = {
 -- =========================================================
 
 VFlow.on("PLAYER_ENTERING_WORLD", "SkillGroups", function()
-    C_Timer.After(1, RebuildSpellMap)
+    _spellMapDirty = true
 end)
 
 -- 监听配置变更
@@ -408,6 +431,6 @@ VFlow.Store.watch(MODULE_KEY, "SkillGroups", function(key, value)
         return
     end
 
-    -- 其他配置变化：重新构建映射表
-    RebuildSpellMap()
+    -- 其他配置变化：标记映射表需要重建
+    _spellMapDirty = true
 end)

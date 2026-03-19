@@ -11,6 +11,7 @@ VFlow.StyleLayout = StyleLayout
 
 local floor = math.floor
 local abs = math.abs
+local Profiler = VFlow.Profiler
 
 -- =========================================================
 -- 工具函数
@@ -31,6 +32,7 @@ end
 
 -- 收集viewer下所有图标帧
 function StyleLayout.CollectIcons(viewer)
+    local _pt = Profiler.start("SL:CollectIcons")
     local icons = {}
     local seen = {}
 
@@ -53,13 +55,16 @@ function StyleLayout.CollectIcons(viewer)
     table.sort(icons, function(a, b)
         return (a.layoutIndex or 0) < (b.layoutIndex or 0)
     end)
+    Profiler.stop(_pt)
     return icons
 end
 
 -- 过滤可见图标
 function StyleLayout.FilterVisible(icons)
+    local _pt = Profiler.start("SL:FilterVisible")
     local visible = {}
-    for _, icon in ipairs(icons) do
+    for i = 1, #icons do
+        local icon = icons[i]
         if icon:IsShown() then
             local tex = icon.Icon and icon.Icon:GetTexture()
             if tex then
@@ -67,6 +72,7 @@ function StyleLayout.FilterVisible(icons)
             end
         end
     end
+    Profiler.stop(_pt)
     return visible
 end
 
